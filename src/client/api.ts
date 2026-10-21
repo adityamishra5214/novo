@@ -18,6 +18,17 @@ export function getActiveMembershipId(): string | null {
   return activeMembershipId;
 }
 
+export class ApiError extends Error {
+  status: number;
+  code?: string;
+  constructor(message: string, status: number, code?: string) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+    this.code = code;
+  }
+}
+
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const headers = new Headers(options.headers || {});
   headers.set('Content-Type', 'application/json');
@@ -27,14 +38,57 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     headers.set('x-membership-id', currentMemId);
   }
 
-  const res = await fetch(path, { ...options, headers });
-  const json = await res.json();
+  const res = await fetch(path, { ...options, headers, credentials: 'include' });
+  const json = await res.json().catch(() => ({}));
 
   if (!res.ok) {
-    throw new Error(json.error?.message || `HTTP ${res.status}: Failed to fetch`);
+    throw new ApiError(json.error?.message || `HTTP ${res.status}: Failed to fetch`, res.status, json.error?.code);
   }
 
   return json.data;
+}
+
+export async function login(credentials: { email: string; password: string; remember?: boolean }) {
+  const data = await request<{ user: User; membershipId: string | null }>('/api/v1/auth/login', {
+    method: 'POST',
+    body: JSON.stringify(credentials),
+  });
+  if (data.membershipId) {
+    setActiveMembershipId(data.membershipId);
+  }
+  return data;
+}
+
+export async function register(formData: {
+  displayName: string;
+  email: string;
+  password: string;
+  companyName: string;
+}) {
+  const data = await request<{ user: User; companyId: string; membershipId: string }>('/api/v1/auth/register', {
+    method: 'POST',
+    body: JSON.stringify(formData),
+  });
+  if (data.membershipId) {
+    setActiveMembershipId(data.membershipId);
+  }
+  return data;
+}
+
+export async function logout() {
+  try {
+    await request('/api/v1/auth/logout', { method: 'POST' });
+  } finally {
+    setActiveMembershipId(null);
+  }
+}
+
+export async function switchMembershipContext(membershipId: string) {
+  setActiveMembershipId(membershipId);
+  await request('/api/v1/auth/switch-membership', {
+    method: 'POST',
+    body: JSON.stringify({ membershipId }),
+  }).catch(() => {});
 }
 
 export async function fetchMe(): Promise<{

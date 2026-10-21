@@ -9,8 +9,9 @@ import { SalesRepPortal } from './pages/SalesRepPortal.js';
 import { TeamPage } from './pages/TeamPage.js';
 import { TargetsPage } from './pages/TargetsPage.js';
 import { AuditLogPage } from './pages/AuditLogPage.js';
+import { AuthPage } from './pages/AuthPage.js';
 import { User, Membership, Company, PersonaOption } from './types.js';
-import { fetchMe, setActiveMembershipId } from './api.js';
+import { fetchMe, logout, switchMembershipContext, setActiveMembershipId } from './api.js';
 
 export const App: React.FC = () => {
   const [currentTab, setCurrentTab] = useState<string>('overview');
@@ -18,6 +19,7 @@ export const App: React.FC = () => {
   const [membership, setMembership] = useState<Membership | null>(null);
   const [company, setCompany] = useState<Company | null>(null);
   const [availablePersonas, setAvailablePersonas] = useState<PersonaOption[]>([]);
+  const [isInitializing, setIsInitializing] = useState(true);
 
   // Modals
   const [isSalesLoggerOpen, setIsSalesLoggerOpen] = useState(false);
@@ -33,7 +35,11 @@ export const App: React.FC = () => {
       setCompany(data.company);
       setAvailablePersonas(data.availableMemberships);
     } catch (err) {
-      console.error('Failed to load user session', err);
+      setUser(null);
+      setMembership(null);
+      setCompany(null);
+    } finally {
+      setIsInitializing(false);
     }
   };
 
@@ -61,12 +67,39 @@ export const App: React.FC = () => {
   };
 
   const handleSwitchPersona = async (membershipId: string) => {
-    setActiveMembershipId(membershipId);
+    await switchMembershipContext(membershipId);
     await loadIdentity();
     showToast(`Switched active persona context.`);
   };
 
+  const handleLogout = async () => {
+    await logout();
+    setUser(null);
+    setMembership(null);
+    setCompany(null);
+    showToast('Signed out of Vantage.');
+  };
+
   const workspaceId = company?.id || 'company_acme';
+
+  // Splash loading screen while checking initial session cookie
+  if (isInitializing) {
+    return (
+      <div style={{ display: 'flex', minHeight: '100vh', alignItems: 'center', justifyContent: 'center', background: '#fafafa' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '14px' }}>
+          <div style={{ width: '38px', height: '38px', background: '#09090b', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700 }}>
+            V
+          </div>
+          <span style={{ fontSize: '13px', color: '#71717a' }}>Loading Vantage...</span>
+        </div>
+      </div>
+    );
+  }
+
+  // Not logged in -> Show Sign in / Sign up page
+  if (!user) {
+    return <AuthPage onSuccess={loadIdentity} />;
+  }
 
   return (
     <div className="app-container">
@@ -79,6 +112,7 @@ export const App: React.FC = () => {
         company={company}
         onOpenPersonaModal={() => handleSwitchPersona(membership?.id === 'mem_alex' ? 'mem_sarah' : 'mem_alex')}
         onOpenSalesLogger={() => setIsSalesLoggerOpen(true)}
+        onLogout={handleLogout}
       />
 
       {/* Main Content Area */}

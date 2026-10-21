@@ -52,12 +52,79 @@ export function authenticate(db: DatabaseSync = getDb()) {
     // Generate request ID for correlation and audit trail
     req.requestId = (req.headers['x-request-id'] as string) || `req_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
 
+    const sessionToken = req.cookies?.vantage_session || (req.headers['authorization']?.startsWith('Bearer ') ? req.headers['authorization'].slice(7) : null);
     const membershipIdHeader = (req.headers['x-membership-id'] as string) || (req.query.membershipId as string);
     const companyIdHeader = (req.headers['x-company-id'] as string) || (req.query.companyId as string);
 
     let membershipRow: any = null;
 
-    if (membershipIdHeader) {
+    if (sessionToken) {
+      const session = db.prepare(`
+        SELECT s.id, s.user_id, s.membership_id, s.expires_at,
+               u.status as user_status
+        FROM sessions s
+        JOIN users u ON s.user_id = u.id
+        WHERE s.token = ?
+      `).get(sessionToken) as any;
+
+      if (!session || new Date(session.expires_at).getTime() < Date.now()) {
+        if (session) {
+          db.prepare('DELETE FROM sessions WHERE id = ?').run(session.id);
+        }
+        res.clearCookie('vantage_session', { path: '/' });
+        res.status(401).json({
+          error: {
+            code: 'UNAUTHENTICATED',
+            message: 'Your session has expired. Please sign in again.',
+            requestId: req.requestId,
+          },
+        });
+        return;
+      }
+
+      if (session.user_status !== 'active') {
+        res.status(403).json({
+          error: {
+            code: 'FORBIDDEN',
+            message: 'Account has been deactivated. Contact your workspace admin.',
+            requestId: req.requestId,
+          },
+        });
+        return;
+      }
+
+      const targetMemId = membershipIdHeader || session.membership_id;
+
+      if (targetMemId) {
+        membershipRow = db.prepare(`
+          SELECT m.*, u.email, u.display_name, u.avatar_initials, u.status as user_status,
+                 c.name as company_name, c.slug as company_slug, c.timezone as company_timezone, c.status as company_status,
+                 t.id as team_id, t.code as team_code, t.name as team_name
+          FROM memberships m
+          JOIN users u ON m.user_id = u.id
+          JOIN companies c ON m.company_id = c.id
+          LEFT JOIN team_memberships tm ON tm.membership_id = m.id
+          LEFT JOIN teams t ON tm.team_id = t.id
+          WHERE m.id = ? AND m.status = 'active'
+        `).get(targetMemId);
+      }
+
+      if (!membershipRow) {
+        membershipRow = db.prepare(`
+          SELECT m.*, u.email, u.display_name, u.avatar_initials, u.status as user_status,
+                 c.name as company_name, c.slug as company_slug, c.timezone as company_timezone, c.status as company_status,
+                 t.id as team_id, t.code as team_code, t.name as team_name
+          FROM memberships m
+          JOIN users u ON m.user_id = u.id
+          JOIN companies c ON m.company_id = c.id
+          LEFT JOIN team_memberships tm ON tm.membership_id = m.id
+          LEFT JOIN teams t ON tm.team_id = t.id
+          WHERE m.user_id = ? AND m.status = 'active'
+          ORDER BY m.role = 'admin' DESC, m.role = 'manager' DESC
+          LIMIT 1
+        `).get(session.user_id);
+      }
+    } else if (membershipIdHeader) {
       membershipRow = db.prepare(`
         SELECT m.*, u.email, u.display_name, u.avatar_initials, u.status as user_status,
                c.name as company_name, c.slug as company_slug, c.timezone as company_timezone, c.status as company_status,
@@ -69,21 +136,6 @@ export function authenticate(db: DatabaseSync = getDb()) {
         LEFT JOIN teams t ON tm.team_id = t.id
         WHERE m.id = ? AND m.status = 'active'
       `).get(membershipIdHeader);
-    } else {
-      // Default to Alex Mercer (Exec/Admin at Acme Corp)
-      membershipRow = db.prepare(`
-        SELECT m.*, u.email, u.display_name, u.avatar_initials, u.status as user_status,
-               c.name as company_name, c.slug as company_slug, c.timezone as company_timezone, c.status as company_status,
-               t.id as team_id, t.code as team_code, t.name as team_name
-        FROM memberships m
-        JOIN users u ON m.user_id = u.id
-        JOIN companies c ON m.company_id = c.id
-        LEFT JOIN team_memberships tm ON tm.membership_id = m.id
-        LEFT JOIN teams t ON tm.team_id = t.id
-        WHERE m.status = 'active' AND (m.role = 'admin' OR m.title LIKE '%Admin%')
-        ORDER BY m.id ASC
-        LIMIT 1
-      `).get();
     }
 
     if (!membershipRow) {

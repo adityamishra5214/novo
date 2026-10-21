@@ -22,6 +22,7 @@ interface SidebarProps {
   company: Company | null;
   onOpenPersonaModal: () => void;
   onOpenSalesLogger: () => void;
+  onLogout?: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -32,6 +33,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   company,
   onOpenPersonaModal,
   onOpenSalesLogger,
+  onLogout,
 }) => {
   return (
     <aside className="sidebar">
@@ -130,8 +132,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       {/* Footer Profile */}
       <div className="sidebar-footer">
-        <div className="profile-card" onClick={onOpenPersonaModal} title="Click to switch persona">
-          <div className="profile-left">
+        <div className="profile-card">
+          <div className="profile-left" onClick={onOpenPersonaModal} title="Click to switch persona context" style={{ cursor: 'pointer', flex: 1, display: 'flex', alignItems: 'center', gap: '10px' }}>
             <div className="avatar">
               {user?.avatarInitials || 'AM'}
             </div>
@@ -142,7 +144,29 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </span>
             </div>
           </div>
-          <LogOut size={15} color="#94a3b8" />
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onLogout?.();
+            }}
+            title="Sign out of Vantage"
+            style={{
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              padding: '6px',
+              display: 'flex',
+              alignItems: 'center',
+              borderRadius: '4px',
+              color: '#94a3b8',
+              transition: 'color 0.15s',
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.color = '#ef4444')}
+            onMouseLeave={(e) => (e.currentTarget.style.color = '#94a3b8')}
+          >
+            <LogOut size={16} />
+          </button>
         </div>
       </div>
     </aside>

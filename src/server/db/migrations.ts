@@ -1,5 +1,6 @@
 import { DatabaseSync } from 'node:sqlite';
 import { getDb } from './client.js';
+import { hashPassword } from '../utils/password.js';
 
 export interface Migration {
   version: number;
@@ -133,6 +134,35 @@ export const migrations: Migration[] = [
         CREATE INDEX IF NOT EXISTS idx_sales_entries_date ON daily_sales_entries(company_id, business_date);
         CREATE INDEX IF NOT EXISTS idx_audit_company ON audit_events(company_id, occurred_at);
       `);
+    },
+  },
+  {
+    version: 2,
+    name: 'add_authentication',
+    up: (db: DatabaseSync) => {
+      db.exec(`
+        ALTER TABLE users ADD COLUMN password_hash TEXT;
+
+        CREATE TABLE IF NOT EXISTS sessions (
+          id TEXT PRIMARY KEY,
+          user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          token TEXT UNIQUE NOT NULL,
+          membership_id TEXT REFERENCES memberships(id),
+          expires_at TEXT NOT NULL,
+          created_at TEXT NOT NULL
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_sessions_token ON sessions(token);
+        CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);
+      `);
+    },
+  },
+  {
+    version: 3,
+    name: 'backfill_passwords',
+    up: (db: DatabaseSync) => {
+      const defaultHash = hashPassword('password123');
+      db.prepare('UPDATE users SET password_hash = ? WHERE password_hash IS NULL').run(defaultHash);
     },
   },
 ];

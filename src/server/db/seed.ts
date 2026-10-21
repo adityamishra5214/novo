@@ -1,6 +1,7 @@
 import { DatabaseSync } from 'node:sqlite';
 import { getDb, withTransaction } from './client.js';
 import { runMigrations } from './migrations.js';
+import { hashPassword } from '../utils/password.js';
 
 export function seedDatabase(db: DatabaseSync): void {
   runMigrations(db);
@@ -52,9 +53,11 @@ export function seedDatabase(db: DatabaseSync): void {
     insertTeam.run('team_beta_sales', 'company_beta', 'Direct Sales', 'DIR', 'active', now);
 
     // 4. Users & Memberships
+    const demoPasswordHash = hashPassword('password123');
+
     const insertUser = db.prepare(`
-      INSERT INTO users (id, email, display_name, avatar_initials, status, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO users (id, email, display_name, avatar_initials, status, created_at, updated_at, password_hash)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `);
     const insertMember = db.prepare(`
       INSERT INTO memberships (id, company_id, user_id, role, title, territory, status, joined_at)
@@ -93,14 +96,14 @@ export function seedDatabase(db: DatabaseSync): void {
     }
 
     // Seed Beta company user for multi-tenant testing
-    insertUser.run('user_beta_admin', 'admin@betadynamics.com', 'Beta Admin', 'BA', 'active', now, now);
+    insertUser.run('user_beta_admin', 'admin@betadynamics.com', 'Beta Admin', 'BA', 'active', now, now, demoPasswordHash);
     insertMember.run('mem_beta_admin', 'company_beta', 'user_beta_admin', 'admin', 'VP of Sales', 'North America', 'active', now);
 
     // 4. Insert all users and memberships first
     for (const rep of repsData) {
       const userId = `user_${rep.id}`;
       const memId = `mem_${rep.id}`;
-      insertUser.run(userId, rep.email, rep.name, rep.initials, 'active', now, now);
+      insertUser.run(userId, rep.email, rep.name, rep.initials, 'active', now, now, demoPasswordHash);
       insertMember.run(memId, 'company_acme', userId, rep.role, rep.title, rep.territory, 'active', now);
       insertTeamMember.run(`tm_${rep.id}`, rep.team, memId);
     }

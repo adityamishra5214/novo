@@ -8,7 +8,7 @@ import { runMigrations } from './db/migrations.js';
 import { seedDatabase } from './db/seed.js';
 import { authenticate } from './middleware/auth.js';
 import { errorHandler } from './middleware/errorHandler.js';
-import { createAuthRouter } from './routes/auth.js';
+import { createAuthRouter, createPublicAuthRouter } from './routes/auth.js';
 import { createWorkspacesRouter } from './routes/workspaces.js';
 import { createTargetsRouter } from './routes/targets.js';
 import { createSalesEntriesRouter } from './routes/salesEntries.js';
@@ -34,8 +34,13 @@ export function createServer(customDbPath?: string) {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
   });
 
-  // API v1 router with tenant authentication
+  // API v1 router
   const apiV1 = express.Router();
+
+  // Public authentication routes (login, register, logout)
+  apiV1.use('/auth', createPublicAuthRouter(db));
+
+  // Protected routes require valid session or membership header
   apiV1.use(authenticate(db));
 
   apiV1.use('/auth', createAuthRouter(db));
