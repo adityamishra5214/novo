@@ -52,8 +52,8 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onSuccess }) => {
     setError(null);
   };
 
-  const handleSSO = (provider: string) => {
-    setError(`Single Sign-On with ${provider} requires workspace domain configuration. Please sign in with your work email credentials or choose a demo account.`);
+  const handleGoogleWorkspace = () => {
+    setError('Google Workspace SSO requires setting up your Google Cloud Client ID (GOOGLE_CLIENT_ID). Please sign in using your work email & password or select a demo account below.');
   };
 
   return (
@@ -233,7 +233,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onSuccess }) => {
               <button
                 type="button"
                 className="auth-sso-btn"
-                onClick={() => handleSSO('Google Workspace')}
+                onClick={handleGoogleWorkspace}
               >
                 <svg width="18" height="18" viewBox="0 0 24 24">
                   <path
@@ -254,17 +254,6 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onSuccess }) => {
                   />
                 </svg>
                 <span>Continue with Google Workspace</span>
-              </button>
-
-              <button
-                type="button"
-                className="auth-sso-btn"
-                onClick={() => handleSSO('SAML / Okta')}
-              >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-                </svg>
-                <span>Sign in with SAML / Okta</span>
               </button>
             </form>
           </div>
