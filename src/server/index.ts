@@ -4,8 +4,6 @@ import cookieParser from 'cookie-parser';
 import path from 'node:path';
 import fs from 'node:fs';
 import { getDb } from './db/client.js';
-import { runMigrations } from './db/migrations.js';
-import { seedDatabase } from './db/seed.js';
 import { authenticate } from './middleware/auth.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { createAuthRouter, createPublicAuthRouter } from './routes/auth.js';
@@ -15,13 +13,8 @@ import { createSalesEntriesRouter } from './routes/salesEntries.js';
 import { createAnalyticsRouter } from './routes/analytics.js';
 import { createAuditRouter } from './routes/audit.js';
 
-export function createServer(customDbPath?: string) {
-  const db = getDb(customDbPath);
-
-  // Initialize schema & seeds if first run
-  runMigrations(db);
-  seedDatabase(db);
-
+export function createServer() {
+  const db = getDb();
   const app = express();
 
   app.use(cors({ origin: true, credentials: true }));
@@ -31,7 +24,7 @@ export function createServer(customDbPath?: string) {
 
   // Health check endpoint
   app.get('/health', (_req, res) => {
-    res.json({ status: 'ok', timestamp: new Date().toISOString() });
+    res.json({ status: 'ok', timestamp: new Date().toISOString(), database: 'supabase' });
   });
 
   // API v1 router
@@ -75,6 +68,6 @@ import { fileURLToPath } from 'node:url';
 if (process.argv[1] && fileURLToPath(import.meta.url).toLowerCase() === path.resolve(process.argv[1]).toLowerCase()) {
   const app = createServer();
   app.listen(PORT, () => {
-    console.log(`Vantage backend listening on http://localhost:${PORT}`);
+    console.log(`Vantage backend listening on http://localhost:${PORT} (Supabase Connected)`);
   });
 }

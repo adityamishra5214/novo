@@ -1,10 +1,9 @@
 import { Router, Request, Response, NextFunction } from 'express';
-import { DatabaseSync } from 'node:sqlite';
-import { getDb } from '../db/client.js';
-import { calculatePacingMetrics, calculateSubmissionHealth, deriveDailyBenchmark } from '../domain/calculations.js';
+import { DatabaseClient, getDb } from '../db/client.js';
+import { calculatePacingMetrics, calculateSubmissionHealth } from '../domain/calculations.js';
 import { AppError } from '../middleware/errorHandler.js';
 
-export function createAnalyticsRouter(db: DatabaseSync = getDb()): Router {
+export function createAnalyticsRouter(db: DatabaseClient = getDb()): Router {
   const router = Router();
 
   const checkTenant = (req: Request, workspaceId: string) => {
@@ -14,7 +13,7 @@ export function createAnalyticsRouter(db: DatabaseSync = getDb()): Router {
   };
 
   // GET /api/v1/workspaces/:workspaceId/analytics/overview
-  router.get('/:workspaceId/analytics/overview', (req: Request, res: Response, next: NextFunction) => {
+  router.get('/:workspaceId/analytics/overview', async (req: Request, res: Response, next: NextFunction) => {
     try {
       const workspaceId = String(req.params.workspaceId);
       checkTenant(req, workspaceId);
@@ -24,32 +23,32 @@ export function createAnalyticsRouter(db: DatabaseSync = getDb()): Router {
       const today = new Date().toISOString().split('T')[0];
 
       // 1. Company Target
-      const companyTargetRow = db.prepare(`
+      const companyTargetRow = await db.prepare(`
         SELECT target_value FROM targets
         WHERE company_id = ? AND scope_type = 'company' AND status = 'active'
         ORDER BY version DESC LIMIT 1
       `).get(workspaceId) as { target_value: number } | undefined;
-      const totalTarget = companyTargetRow?.target_value || 1600000;
+      const totalTarget = Number(companyTargetRow?.target_value || 0);
 
       // 2. Total Closed Revenue (excluding drafts)
-      const closedRow = db.prepare(`
+      const closedRow = await db.prepare(`
         SELECT COALESCE(SUM(actual_value), 0) as total_closed
         FROM daily_sales_entries
         WHERE company_id = ? AND status != 'Draft'
           AND business_date >= ? AND business_date <= ?
-      `).get(workspaceId, periodStart, periodEnd) as { total_closed: number };
-      const totalClosed = closedRow?.total_closed || 1420000;
+      `).get(workspaceId, periodStart, periodEnd) as { total_closed: string | number };
+      const totalClosed = Number(closedRow?.total_closed || 0);
 
       // Calculate pacing
       const pacing = calculatePacingMetrics({
-        totalTarget,
+        totalTarget: totalTarget || 100000,
         actualClosed: totalClosed,
         totalBusinessDays: 22,
         elapsedBusinessDays: 16,
       });
 
       // 3. Active Reps & Submission Health for TODAY
-      const allReps = db.prepare(`
+      const allReps = await db.prepare(`
         SELECT m.id as membership_id, u.display_name, u.avatar_initials, m.title, t.code as team_code, t.name as team_name
         FROM memberships m
         JOIN users u ON m.user_id = u.id
@@ -58,7 +57,7 @@ export function createAnalyticsRouter(db: DatabaseSync = getDb()): Router {
         WHERE m.company_id = ? AND m.status = 'active'
       `).all(workspaceId) as any[];
 
-      const todaySubmissions = db.prepare(`
+      const todaySubmissions = await db.prepare(`
         SELECT DISTINCT membership_id FROM daily_sales_entries
         WHERE company_id = ? AND business_date = ? AND status != 'Draft'
       `).all(workspaceId, today) as { membership_id: string }[];
@@ -68,69 +67,72 @@ export function createAnalyticsRouter(db: DatabaseSync = getDb()): Router {
       const submissionHealth = calculateSubmissionHealth(allReps.length, submittedSet.size);
 
       // 4. Target Realization by Segment (Enterprise vs Mid-Market)
-      const entTargetRow = db.prepare(`
+      const entTargetRow = await db.prepare(`
         SELECT target_value FROM targets WHERE company_id = ? AND scope_id = 'team_ent' AND status = 'active' LIMIT 1
       `).get(workspaceId) as { target_value: number } | undefined;
-      const entTarget = entTargetRow?.target_value || 1000000;
+      const entTarget = Number(entTargetRow?.target_value || 0);
 
-      const entClosedRow = db.prepare(`
+      const entClosedRow = await db.prepare(`
         SELECT COALESCE(SUM(e.actual_value), 0) as closed
         FROM daily_sales_entries e
         JOIN team_memberships tm ON tm.membership_id = e.membership_id
         WHERE e.company_id = ? AND tm.team_id = 'team_ent' AND e.status != 'Draft'
-      `).get(workspaceId) as { closed: number };
-      const entClosed = entClosedRow?.closed || 950000;
+      `).get(workspaceId) as { closed: string | number };
+      const entClosed = Number(entClosedRow?.closed || 0);
 
-      const mmTargetRow = db.prepare(`
+      const mmTargetRow = await db.prepare(`
         SELECT target_value FROM targets WHERE company_id = ? AND scope_id = 'team_mm' AND status = 'active' LIMIT 1
       `).get(workspaceId) as { target_value: number } | undefined;
-      const mmTarget = mmTargetRow?.target_value || 600000;
+      const mmTarget = Number(mmTargetRow?.target_value || 0);
 
-      const mmClosedRow = db.prepare(`
+      const mmClosedRow = await db.prepare(`
         SELECT COALESCE(SUM(e.actual_value), 0) as closed
         FROM daily_sales_entries e
         JOIN team_memberships tm ON tm.membership_id = e.membership_id
         WHERE e.company_id = ? AND tm.team_id = 'team_mm' AND e.status != 'Draft'
-      `).get(workspaceId) as { closed: number };
-      const mmClosed = mmClosedRow?.closed || 470000;
+      `).get(workspaceId) as { closed: string | number };
+      const mmClosed = Number(mmClosedRow?.closed || 0);
 
       // 5. Rep Attainment Leaderboard
-      const leaderboard = allReps.map((rep) => {
-        const targetRow = db.prepare(`
-          SELECT target_value FROM targets WHERE company_id = ? AND scope_id = ? AND status = 'active' LIMIT 1
-        `).get(workspaceId, rep.membership_id) as { target_value: number } | undefined;
-        const repTarget = targetRow?.target_value || 150000;
+      const leaderboard = await Promise.all(
+        allReps.map(async (rep) => {
+          const targetRow = await db.prepare(`
+            SELECT target_value FROM targets WHERE company_id = ? AND scope_id = ? AND status = 'active' LIMIT 1
+          `).get(workspaceId, rep.membership_id) as { target_value: number } | undefined;
+          const repTarget = Number(targetRow?.target_value || 0);
 
-        const repClosedRow = db.prepare(`
-          SELECT COALESCE(SUM(actual_value), 0) as closed
-          FROM daily_sales_entries
-          WHERE company_id = ? AND membership_id = ? AND status != 'Draft'
-        `).get(workspaceId, rep.membership_id) as { closed: number };
-        const repClosed = repClosedRow?.closed || 0;
+          const repClosedRow = await db.prepare(`
+            SELECT COALESCE(SUM(actual_value), 0) as closed
+            FROM daily_sales_entries
+            WHERE company_id = ? AND membership_id = ? AND status != 'Draft'
+          `).get(workspaceId, rep.membership_id) as { closed: string | number };
+          const repClosed = Number(repClosedRow?.closed || 0);
 
-        const attainmentPercent = repTarget > 0 ? (repClosed / repTarget) * 100 : 0;
-        const delta = repClosed - repTarget;
+          const attainmentPercent = repTarget > 0 ? (repClosed / repTarget) * 100 : 0;
+          const delta = repClosed - repTarget;
 
-        let status: 'Ahead' | 'On Track' | 'Needs Nudge' = 'On Track';
-        if (attainmentPercent >= 100) status = 'Ahead';
-        else if (attainmentPercent < 80) status = 'Needs Nudge';
+          let status: 'Ahead' | 'On Track' | 'Needs Nudge' = 'On Track';
+          if (attainmentPercent >= 100) status = 'Ahead';
+          else if (attainmentPercent < 80) status = 'Needs Nudge';
 
-        return {
-          membershipId: rep.membership_id,
-          name: rep.display_name,
-          initials: rep.avatar_initials,
-          title: rep.title,
-          team: rep.team_code || 'MM',
-          quotaTarget: repTarget,
-          actualClosed: repClosed,
-          attainmentPercent: Math.round(attainmentPercent * 10) / 10,
-          delta: Math.round(delta),
-          status,
-        };
-      }).sort((a, b) => b.attainmentPercent - a.attainmentPercent);
+          return {
+            membershipId: rep.membership_id,
+            name: rep.display_name,
+            initials: rep.avatar_initials,
+            title: rep.title,
+            team: rep.team_code || 'MM',
+            quotaTarget: repTarget,
+            actualClosed: repClosed,
+            attainmentPercent: Math.round(attainmentPercent * 10) / 10,
+            delta: Math.round(delta),
+            status,
+          };
+        })
+      );
+      leaderboard.sort((a, b) => b.attainmentPercent - a.attainmentPercent);
 
       // 6. Recent High-Value Closes Live Feed
-      const recentCloses = db.prepare(`
+      const recentCloses = await db.prepare(`
         SELECT e.id, e.client_name, e.deal_category, e.actual_value, e.created_at,
                u.display_name as rep_name, t.code as team_code
         FROM daily_sales_entries e
@@ -142,7 +144,6 @@ export function createAnalyticsRouter(db: DatabaseSync = getDb()): Router {
         ORDER BY e.created_at DESC LIMIT 5
       `).all(workspaceId);
 
-      // 7. Attainment Velocity & Weekday Cadence (April 1 to April 28)
       const cadenceDays = [
         { date: 'APR 01 (W1)', value: 42000, target: 35000 },
         { date: 'APR 03', value: 48000, target: 40000 },
@@ -191,10 +192,10 @@ export function createAnalyticsRouter(db: DatabaseSync = getDb()): Router {
             cutoff: '18:00 EST',
           } : null,
           segments: {
-            enterprise: { target: entTarget, actual: entClosed, percent: Math.round((entClosed / entTarget) * 1000) / 10 },
-            midMarket: { target: mmTarget, actual: mmClosed, percent: Math.round((mmClosed / mmTarget) * 1000) / 10 },
+            enterprise: { target: entTarget, actual: entClosed, percent: entTarget > 0 ? Math.round((entClosed / entTarget) * 1000) / 10 : 0 },
+            midMarket: { target: mmTarget, actual: mmClosed, percent: mmTarget > 0 ? Math.round((mmClosed / mmTarget) * 1000) / 10 : 0 },
           },
-          runRateForecast: 1740000,
+          runRateForecast: totalClosed > 0 ? totalClosed * 1.2 : 0,
           cadenceDays,
           leaderboard,
           recentCloses,
@@ -206,7 +207,7 @@ export function createAnalyticsRouter(db: DatabaseSync = getDb()): Router {
   });
 
   // GET /api/v1/workspaces/:workspaceId/analytics/rep-portal
-  router.get('/:workspaceId/analytics/rep-portal', (req: Request, res: Response, next: NextFunction) => {
+  router.get('/:workspaceId/analytics/rep-portal', async (req: Request, res: Response, next: NextFunction) => {
     try {
       const workspaceId = String(req.params.workspaceId);
       checkTenant(req, workspaceId);
@@ -214,7 +215,7 @@ export function createAnalyticsRouter(db: DatabaseSync = getDb()): Router {
       const targetMembershipId = (req.query.membershipId as string) || req.membership!.id;
       const today = new Date().toISOString().split('T')[0];
 
-      const rep = db.prepare(`
+      const rep = await db.prepare(`
         SELECT m.id, m.title, m.territory, u.display_name, t.name as team_name, t.code as team_code
         FROM memberships m
         JOIN users u ON m.user_id = u.id
@@ -227,24 +228,24 @@ export function createAnalyticsRouter(db: DatabaseSync = getDb()): Router {
         throw new AppError('NOT_FOUND', 'Representative record not found', 404);
       }
 
-      const targetRow = db.prepare(`
+      const targetRow = await db.prepare(`
         SELECT target_value FROM targets WHERE company_id = ? AND scope_id = ? AND status = 'active' LIMIT 1
       `).get(workspaceId, targetMembershipId) as { target_value: number } | undefined;
-      const repMonthlyGoal = targetRow?.target_value || 85000;
+      const repMonthlyGoal = Number(targetRow?.target_value || 0);
 
-      const todayEntries = db.prepare(`
+      const todayEntries = await db.prepare(`
         SELECT COALESCE(SUM(actual_value), 0) as today_total
         FROM daily_sales_entries
         WHERE company_id = ? AND membership_id = ? AND business_date = ? AND status != 'Draft'
-      `).get(workspaceId, targetMembershipId, today) as { today_total: number };
-      const todaySalesLogged = todayEntries?.today_total || 3850;
+      `).get(workspaceId, targetMembershipId, today) as { today_total: string | number };
+      const todaySalesLogged = Number(todayEntries?.today_total || 0);
 
-      const mtdRow = db.prepare(`
+      const mtdRow = await db.prepare(`
         SELECT COALESCE(SUM(actual_value), 0) as mtd_total
         FROM daily_sales_entries
         WHERE company_id = ? AND membership_id = ? AND status != 'Draft'
-      `).get(workspaceId, targetMembershipId) as { mtd_total: number };
-      const mtdClosed = mtdRow?.mtd_total || 68400;
+      `).get(workspaceId, targetMembershipId) as { mtd_total: string | number };
+      const mtdClosed = Number(mtdRow?.mtd_total || 0);
 
       const sevenDayOutput = [
         { day: 'Fri 18', date: '2025-04-18', amount: 4200, isToday: false },
@@ -256,14 +257,14 @@ export function createAnalyticsRouter(db: DatabaseSync = getDb()): Router {
         { day: 'Today', date: today, amount: todaySalesLogged, isToday: true },
       ];
 
-      const recentEntries = db.prepare(`
+      const recentEntries = await db.prepare(`
         SELECT id, client_name, deal_category, actual_value, business_date, status, created_at, note
         FROM daily_sales_entries
         WHERE company_id = ? AND membership_id = ? AND status != 'Draft'
         ORDER BY business_date DESC, created_at DESC LIMIT 5
       `).all(workspaceId, targetMembershipId);
 
-      const drafts = db.prepare(`
+      const drafts = await db.prepare(`
         SELECT id, client_name, deal_category, actual_value, business_date, status, note
         FROM daily_sales_entries
         WHERE company_id = ? AND membership_id = ? AND status = 'Draft'
@@ -276,8 +277,8 @@ export function createAnalyticsRouter(db: DatabaseSync = getDb()): Router {
             membershipId: rep.id,
             name: rep.display_name,
             title: rep.title,
-            territory: rep.territory || 'Mid-Market North',
-            period: 'Q2 2025 (April)',
+            territory: rep.territory || 'Direct Sales',
+            period: 'Current Period',
             remainingBusinessDays: 6,
           },
           kpi: {
@@ -286,46 +287,46 @@ export function createAnalyticsRouter(db: DatabaseSync = getDb()): Router {
               target: 4500,
               percent: Math.round((todaySalesLogged / 4500) * 1000) / 10,
               delta: todaySalesLogged - 4500,
-              note: 'Close expected < 5 PM',
+              note: 'EOD Tracking',
             },
             monthToDateClosed: {
               value: mtdClosed,
               target: repMonthlyGoal,
-              percent: Math.round((mtdClosed / repMonthlyGoal) * 1000) / 10,
-              needPerDay: Math.round((repMonthlyGoal - mtdClosed) / 6),
+              percent: repMonthlyGoal > 0 ? Math.round((mtdClosed / repMonthlyGoal) * 1000) / 10 : 0,
+              needPerDay: repMonthlyGoal > mtdClosed ? Math.round((repMonthlyGoal - mtdClosed) / 6) : 0,
               remainingDays: 6,
             },
             projectedMonthEnd: {
-              value: 92200,
-              nominalPercent: '+8.4%',
-              pacingBuffer: '+4.2% ahead of nominal model',
+              value: mtdClosed * 1.25,
+              nominalPercent: '+0.0%',
+              pacingBuffer: 'Tracking active pipeline',
             },
             winEntryRate: {
               value: '100%',
               label: 'On-time EOD',
-              consecutiveDays: 18,
-              badge: 'Audited badge • Tier 1 eligibility active',
+              consecutiveDays: 1,
+              badge: 'Audited badge • Active',
             },
           },
           chart: {
             benchmarkQuota: 4500,
-            dateRange: 'April 18 - April 24, 2025',
+            dateRange: 'Recent Activity',
             bars: sevenDayOutput,
           },
           pacingSurplus: {
-            nominalDelta: '+4.2% Nominal',
-            remainingDelta: 16600,
-            rollingCadence: 4120,
+            nominalDelta: '+0.0% Nominal',
+            remainingDelta: Math.max(0, repMonthlyGoal - mtdClosed),
+            rollingCadence: Math.round(mtdClosed / 7),
             thresholdDay: 27,
-            daysAhead: 2,
-            tier: 'Tier 3 (12.5% Payout)',
+            daysAhead: 0,
+            tier: 'Tier 1 Standard',
           },
           compliance: {
             time: '17:45 EDT',
             cutoff: '18:00 EST',
             items: [
-              { id: '1', title: 'Midday Sync Logged', detail: `Recorded $${todaySalesLogged.toLocaleString()} via Linear Orbit entry.`, completed: true },
-              { id: '2', title: 'Reconcile Pending Draft', detail: `${drafts.length} uncommitted transaction requires contract PDF.`, completed: drafts.length === 0 },
+              { id: '1', title: 'Midday Sync Logged', detail: `Recorded $${todaySalesLogged.toLocaleString()} entry.`, completed: todaySalesLogged > 0 },
+              { id: '2', title: 'Reconcile Pending Draft', detail: `${drafts.length} uncommitted transaction.`, completed: drafts.length === 0 },
               { id: '3', title: 'EOD Affirmation Sign-off', detail: 'Auto-locks at 18:00 EST.', completed: false },
             ],
           },

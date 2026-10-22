@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { DatabaseSync } from 'node:sqlite';
+import { DatabaseClient, getDb } from '../db/client.js';
 
 export function requireRole(...allowedRoles: ('operator' | 'admin' | 'manager' | 'rep')[]) {
   return (req: Request, res: Response, next: NextFunction): void => {
@@ -29,8 +29,8 @@ export function requireRole(...allowedRoles: ('operator' | 'admin' | 'manager' |
   };
 }
 
-export function recordAuditEvent(
-  db: DatabaseSync,
+export async function recordAuditEvent(
+  db: DatabaseClient = getDb(),
   params: {
     companyId: string;
     actorMembershipId: string;
@@ -40,15 +40,13 @@ export function recordAuditEvent(
     requestId: string;
     details: Record<string, any>;
   }
-): void {
-  const stmt = db.prepare(`
+): Promise<void> {
+  const eventId = `audit_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+  await db.prepare(`
     INSERT INTO audit_events (
       id, company_id, actor_membership_id, action, entity_type, entity_id, occurred_at, request_id, details_json
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `);
-
-  const eventId = `audit_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-  stmt.run(
+  `).run(
     eventId,
     params.companyId,
     params.actorMembershipId,

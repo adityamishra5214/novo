@@ -1,11 +1,10 @@
 import { Router, Request, Response, NextFunction } from 'express';
-import { DatabaseSync } from 'node:sqlite';
 import { z } from 'zod';
-import { getDb } from '../db/client.js';
+import { DatabaseClient, getDb } from '../db/client.js';
 import { requireRole, recordAuditEvent } from '../middleware/authorize.js';
 import { AppError } from '../middleware/errorHandler.js';
 
-export function createTargetsRouter(db: DatabaseSync = getDb()): Router {
+export function createTargetsRouter(db: DatabaseClient = getDb()): Router {
   const router = Router();
 
   const checkTenant = (req: Request, workspaceId: string) => {
@@ -15,7 +14,7 @@ export function createTargetsRouter(db: DatabaseSync = getDb()): Router {
   };
 
   // GET /api/v1/workspaces/:workspaceId/targets
-  router.get('/:workspaceId/targets', (req: Request, res: Response, next: NextFunction) => {
+  router.get('/:workspaceId/targets', async (req: Request, res: Response, next: NextFunction) => {
     try {
       const workspaceId = String(req.params.workspaceId);
       checkTenant(req, workspaceId);
@@ -57,7 +56,7 @@ export function createTargetsRouter(db: DatabaseSync = getDb()): Router {
 
       sql += ' ORDER BY t.scope_type ASC, t.target_value DESC';
 
-      const targets = db.prepare(sql).all(...params);
+      const targets = await db.prepare(sql).all(...params);
       res.json({ data: targets });
     } catch (err) {
       next(err);
@@ -75,7 +74,7 @@ export function createTargetsRouter(db: DatabaseSync = getDb()): Router {
   });
 
   // POST /api/v1/workspaces/:workspaceId/targets
-  router.post('/:workspaceId/targets', requireRole('admin', 'manager'), (req: Request, res: Response, next: NextFunction) => {
+  router.post('/:workspaceId/targets', requireRole('admin', 'manager'), async (req: Request, res: Response, next: NextFunction) => {
     try {
       const workspaceId = String(req.params.workspaceId);
       checkTenant(req, workspaceId);
@@ -84,7 +83,7 @@ export function createTargetsRouter(db: DatabaseSync = getDb()): Router {
       const now = new Date().toISOString();
       const targetId = `target_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
 
-      db.prepare(`
+      await db.prepare(`
         INSERT INTO targets (
           id, company_id, metric_id, scope_type, scope_id, period_type, period_start, period_end,
           target_value, effective_from, effective_to, created_by_membership_id, status, version, created_at, updated_at
@@ -106,7 +105,7 @@ export function createTargetsRouter(db: DatabaseSync = getDb()): Router {
         now
       );
 
-      recordAuditEvent(db, {
+      await recordAuditEvent(db, {
         companyId: workspaceId,
         actorMembershipId: req.membership!.id,
         action: 'TARGET_CREATED',

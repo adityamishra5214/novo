@@ -1,11 +1,10 @@
 import { Router, Request, Response, NextFunction } from 'express';
-import { DatabaseSync } from 'node:sqlite';
 import { z } from 'zod';
-import { getDb, withTransaction } from '../db/client.js';
+import { DatabaseClient, getDb, withTransaction } from '../db/client.js';
 import { recordAuditEvent } from '../middleware/authorize.js';
 import { AppError } from '../middleware/errorHandler.js';
 
-export function createSalesEntriesRouter(db: DatabaseSync = getDb()): Router {
+export function createSalesEntriesRouter(db: DatabaseClient = getDb()): Router {
   const router = Router();
 
   const checkTenant = (req: Request, workspaceId: string) => {
@@ -15,7 +14,7 @@ export function createSalesEntriesRouter(db: DatabaseSync = getDb()): Router {
   };
 
   // GET /api/v1/workspaces/:workspaceId/sales-entries
-  router.get('/:workspaceId/sales-entries', (req: Request, res: Response, next: NextFunction) => {
+  router.get('/:workspaceId/sales-entries', async (req: Request, res: Response, next: NextFunction) => {
     try {
       const workspaceId = String(req.params.workspaceId);
       checkTenant(req, workspaceId);
@@ -64,7 +63,7 @@ export function createSalesEntriesRouter(db: DatabaseSync = getDb()): Router {
       sql += ' ORDER BY e.business_date DESC, e.created_at DESC LIMIT ? OFFSET ?';
       params.push(Number(limit), Number(offset));
 
-      const entries = db.prepare(sql).all(...params);
+      const entries = await db.prepare(sql).all(...params);
       res.json({ data: entries });
     } catch (err) {
       next(err);
@@ -83,7 +82,7 @@ export function createSalesEntriesRouter(db: DatabaseSync = getDb()): Router {
   });
 
   // POST /api/v1/workspaces/:workspaceId/sales-entries
-  router.post('/:workspaceId/sales-entries', (req: Request, res: Response, next: NextFunction) => {
+  router.post('/:workspaceId/sales-entries', async (req: Request, res: Response, next: NextFunction) => {
     try {
       const workspaceId = String(req.params.workspaceId);
       checkTenant(req, workspaceId);
@@ -98,14 +97,14 @@ export function createSalesEntriesRouter(db: DatabaseSync = getDb()): Router {
 
       let metricId: string = input.metricId || '';
       if (!metricId) {
-        const defaultMetric = db.prepare("SELECT id FROM sales_metrics WHERE company_id = ? AND status = 'active' LIMIT 1").get(workspaceId) as any;
+        const defaultMetric = await db.prepare("SELECT id FROM sales_metrics WHERE company_id = ? AND status = 'active' LIMIT 1").get(workspaceId) as any;
         metricId = defaultMetric?.id || 'metric_new_arr';
       }
 
       const entryId = `entry_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
 
-      withTransaction(db, () => {
-        db.prepare(`
+      await withTransaction(async (tx) => {
+        await tx.prepare(`
           INSERT INTO daily_sales_entries (
             id, company_id, membership_id, metric_id, client_name, deal_category, business_date,
             actual_value, note, status, created_by_membership_id, created_at, updated_at
@@ -126,7 +125,7 @@ export function createSalesEntriesRouter(db: DatabaseSync = getDb()): Router {
           now
         );
 
-        recordAuditEvent(db, {
+        await recordAuditEvent(tx, {
           companyId: workspaceId,
           actorMembershipId: req.membership!.id,
           action: 'SALES_ENTRY_CREATED',
@@ -158,21 +157,21 @@ export function createSalesEntriesRouter(db: DatabaseSync = getDb()): Router {
   });
 
   // POST /api/v1/workspaces/:workspaceId/sales-entries/:entryId/confirm
-  router.post('/:workspaceId/sales-entries/:entryId/confirm', (req: Request, res: Response, next: NextFunction) => {
+  router.post('/:workspaceId/sales-entries/:entryId/confirm', async (req: Request, res: Response, next: NextFunction) => {
     try {
       const workspaceId = String(req.params.workspaceId);
       const entryId = String(req.params.entryId);
       checkTenant(req, workspaceId);
 
-      const entry = db.prepare('SELECT * FROM daily_sales_entries WHERE id = ? AND company_id = ?').get(entryId, workspaceId) as any;
+      const entry = await db.prepare('SELECT * FROM daily_sales_entries WHERE id = ? AND company_id = ?').get(entryId, workspaceId) as any;
       if (!entry) {
         throw new AppError('NOT_FOUND', 'Sales entry not found', 404);
       }
 
       const now = new Date().toISOString();
-      db.prepare("UPDATE daily_sales_entries SET status = 'Confirmed', updated_at = ? WHERE id = ?").run(now, entryId);
+      await db.prepare("UPDATE daily_sales_entries SET status = 'Confirmed', updated_at = ? WHERE id = ?").run(now, entryId);
 
-      recordAuditEvent(db, {
+      await recordAuditEvent(db, {
         companyId: workspaceId,
         actorMembershipId: req.membership!.id,
         action: 'SALES_ENTRY_CONFIRMED',

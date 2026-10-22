@@ -1,10 +1,9 @@
 import { Router, Request, Response, NextFunction } from 'express';
-import { DatabaseSync } from 'node:sqlite';
-import { getDb } from '../db/client.js';
+import { DatabaseClient, getDb } from '../db/client.js';
 import { requireRole } from '../middleware/authorize.js';
 import { AppError } from '../middleware/errorHandler.js';
 
-export function createAuditRouter(db: DatabaseSync = getDb()): Router {
+export function createAuditRouter(db: DatabaseClient = getDb()): Router {
   const router = Router();
 
   const checkTenant = (req: Request, workspaceId: string) => {
@@ -14,7 +13,7 @@ export function createAuditRouter(db: DatabaseSync = getDb()): Router {
   };
 
   // GET /api/v1/workspaces/:workspaceId/audit-events
-  router.get('/:workspaceId/audit-events', requireRole('admin', 'manager'), (req: Request, res: Response, next: NextFunction) => {
+  router.get('/:workspaceId/audit-events', requireRole('admin', 'manager'), async (req: Request, res: Response, next: NextFunction) => {
     try {
       const workspaceId = String(req.params.workspaceId);
       checkTenant(req, workspaceId);
@@ -38,7 +37,7 @@ export function createAuditRouter(db: DatabaseSync = getDb()): Router {
       sql += ' ORDER BY a.occurred_at DESC LIMIT ? OFFSET ?';
       params.push(Number(limit), Number(offset));
 
-      const events = db.prepare(sql).all(...params) as any[];
+      const events = await db.prepare(sql).all(...params) as any[];
 
       const formatted = events.map((e) => {
         let details = {};
