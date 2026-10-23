@@ -154,6 +154,7 @@ export const App: React.FC = () => {
 
           {currentTab === 'team' && (
             <TeamPage
+              key={`${workspaceId}_${membership?.id}`}
               workspaceId={workspaceId}
               onOpenInviteModal={() => setIsInviteModalOpen(true)}
             />
@@ -161,6 +162,7 @@ export const App: React.FC = () => {
 
           {currentTab === 'targets' && (
             <TargetsPage
+              key={`${workspaceId}_${membership?.id}`}
               workspaceId={workspaceId}
               onOpenQuotasModal={() => setIsQuotasModalOpen(true)}
             />
@@ -179,7 +181,10 @@ export const App: React.FC = () => {
           )}
 
           {currentTab === 'audit' && (
-            <AuditLogPage workspaceId={workspaceId} />
+            <AuditLogPage
+              key={`${workspaceId}_${membership?.id}`}
+              workspaceId={workspaceId}
+            />
           )}
 
           {currentTab === 'settings' && (

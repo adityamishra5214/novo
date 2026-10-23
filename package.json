@@ -8,6 +8,7 @@
     "dev:server": "tsx watch src/server/index.ts",
     "build": "tsc --noEmit && vite build",
     "start": "tsx src/server/index.ts",
+    "db:seed": "tsx src/server/db/seed.ts",
     "test": "vitest run --fileParallelism=false"
   },
   "dependencies": {

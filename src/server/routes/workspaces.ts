@@ -72,8 +72,8 @@ export function createWorkspacesRouter(db: DatabaseClient = getDb()): Router {
     teamId: z.string().optional(),
   });
 
-  // POST /api/v1/workspaces/:workspaceId/members
-  router.post('/:workspaceId/members', requireRole('admin', 'operator'), async (req: Request, res: Response, next: NextFunction) => {
+  // POST /api/v1/workspaces/:workspaceId/members or /members/invite
+  router.post(['/:workspaceId/members', '/:workspaceId/members/invite'], requireRole('admin', 'operator'), async (req: Request, res: Response, next: NextFunction) => {
     try {
       const workspaceId = String(req.params.workspaceId);
       checkTenant(req, workspaceId);

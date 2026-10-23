@@ -50,7 +50,13 @@ export const AuditLogPage: React.FC<AuditLogPageProps> = ({ workspaceId }) => {
           <p style={{ color: '#64748b', fontSize: '13px' }}>Loading audit records...</p>
         </div>
       ) : error ? (
-        <div className="alert-card">{error}</div>
+        <div className="alert-card" style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '16px 20px', borderRadius: '8px' }}>
+          <ShieldCheck size={20} style={{ color: '#dc2626', flexShrink: 0 }} />
+          <div>
+            <div style={{ fontWeight: 600, color: '#991b1b', marginBottom: '2px' }}>Access Restricted</div>
+            <div style={{ fontSize: '13px', color: '#7f1d1d' }}>{error}</div>
+          </div>
+        </div>
       ) : (
         <div className="table-container">
           <table className="data-table">

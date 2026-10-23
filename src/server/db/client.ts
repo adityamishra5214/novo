@@ -1,7 +1,10 @@
 import pg from 'pg';
 import 'dotenv/config';
 
-const { Pool } = pg;
+const { Pool, types } = pg;
+
+// Parse PostgreSQL NUMERIC/DECIMAL as JavaScript number
+types.setTypeParser(1700, (val: string) => (val === null ? null : parseFloat(val)));
 
 let poolInstance: pg.Pool | null = null;
 

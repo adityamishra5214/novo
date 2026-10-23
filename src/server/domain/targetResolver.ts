@@ -1,4 +1,4 @@
-import { DatabaseSync } from 'node:sqlite';
+import { DatabaseClient } from '../db/client.js';
 
 export interface ResolvedTarget {
   id: string;
@@ -16,8 +16,8 @@ export interface ResolvedTarget {
  * Resolves active target for a representative for a given period.
  * Precedence rule: user-specific target > assigned team target > company default target.
  */
-export function resolveRepTarget(
-  db: DatabaseSync,
+export async function resolveRepTarget(
+  db: DatabaseClient,
   params: {
     companyId: string;
     membershipId: string;
@@ -25,7 +25,7 @@ export function resolveRepTarget(
     periodEnd: string;
     metricId?: string;
   }
-): ResolvedTarget | null {
+): Promise<ResolvedTarget | null> {
   const { companyId, membershipId, periodStart, periodEnd, metricId } = params;
 
   // 1. Try user-specific target
@@ -47,13 +47,13 @@ export function resolveRepTarget(
   }
   sql += ' ORDER BY t.version DESC LIMIT 1';
 
-  let row = db.prepare(sql).get(...sqlParams) as any;
+  let row = await db.prepare(sql).get(...sqlParams) as any;
   if (row) {
     return {
       id: row.id,
       scopeType: 'user',
       scopeId: row.scope_id,
-      targetValue: row.target_value,
+      targetValue: Number(row.target_value),
       periodStart: row.period_start,
       periodEnd: row.period_end,
       metricId: row.metric_id,
@@ -63,7 +63,7 @@ export function resolveRepTarget(
   }
 
   // 2. Try team target for rep's team
-  const teamMembership = db.prepare(`
+  const teamMembership = await db.prepare(`
     SELECT team_id FROM team_memberships WHERE membership_id = ? LIMIT 1
   `).get(membershipId) as { team_id: string } | undefined;
 
@@ -85,13 +85,13 @@ export function resolveRepTarget(
       teamSqlParams.push(metricId);
     }
     teamSql += ' ORDER BY t.version DESC LIMIT 1';
-    row = db.prepare(teamSql).get(...teamSqlParams) as any;
+    row = await db.prepare(teamSql).get(...teamSqlParams) as any;
     if (row) {
       return {
         id: row.id,
         scopeType: 'team',
         scopeId: row.scope_id,
-        targetValue: row.target_value,
+        targetValue: Number(row.target_value),
         periodStart: row.period_start,
         periodEnd: row.period_end,
         metricId: row.metric_id,
@@ -118,13 +118,13 @@ export function resolveRepTarget(
     compSqlParams.push(metricId);
   }
   compSql += ' ORDER BY t.version DESC LIMIT 1';
-  row = db.prepare(compSql).get(...compSqlParams) as any;
+  row = await db.prepare(compSql).get(...compSqlParams) as any;
   if (row) {
     return {
       id: row.id,
       scopeType: 'company',
       scopeId: row.scope_id,
-      targetValue: row.target_value,
+      targetValue: Number(row.target_value),
       periodStart: row.period_start,
       periodEnd: row.period_end,
       metricId: row.metric_id,

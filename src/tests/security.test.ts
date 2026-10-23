@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import request from 'supertest';
 import { createServer } from '../server/index.js';
-import { DatabaseSync } from 'node:sqlite';
 import { getDb } from '../server/db/client.js';
 
 describe('Multi-Tenant Isolation & Authorization Boundaries', () => {
