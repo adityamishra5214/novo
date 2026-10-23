@@ -150,7 +150,7 @@ export function createPublicAuthRouter(db: DatabaseClient = getDb()): Router {
         // Create default revenue metric
         await tx.prepare(`
           INSERT INTO sales_metrics (id, company_id, name, code, unit, value_type, allows_negative, status)
-          VALUES (?, ?, 'Revenue', 'revenue', 'USD', 'currency', 0, 'active')
+          VALUES (?, ?, 'Revenue', 'revenue', 'USD', 'currency', false, 'active')
         `).run(metricId, companyId);
 
         // Audit

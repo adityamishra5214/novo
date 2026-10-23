@@ -41,8 +41,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
       <div className="sidebar-header">
         <div className="brand-row">
           <div className="brand-logo">
-            <div className="brand-icon-box">V</div>
-            <span>Vantage</span>
+            <div className="brand-icon-box">T</div>
+            <span>Tdami Tech</span>
           </div>
           <div className="live-badge">
             <span className="pulse-dot"></span>
@@ -150,7 +150,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               e.stopPropagation();
               onLogout?.();
             }}
-            title="Sign out of Vantage"
+            title="Sign out of Tdami Tech"
             style={{
               background: 'none',
               border: 'none',

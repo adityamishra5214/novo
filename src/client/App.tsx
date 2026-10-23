@@ -77,7 +77,7 @@ export const App: React.FC = () => {
     setUser(null);
     setMembership(null);
     setCompany(null);
-    showToast('Signed out of Vantage.');
+    showToast('Signed out of Tdami Tech.');
   };
 
   const workspaceId = company?.id || 'company_acme';
@@ -88,9 +88,9 @@ export const App: React.FC = () => {
       <div style={{ display: 'flex', minHeight: '100vh', alignItems: 'center', justifyContent: 'center', background: '#fafafa' }}>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '14px' }}>
           <div style={{ width: '38px', height: '38px', background: '#09090b', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700 }}>
-            V
+            T
           </div>
-          <span style={{ fontSize: '13px', color: '#71717a' }}>Loading Vantage...</span>
+          <span style={{ fontSize: '13px', color: '#71717a' }}>Loading Tdami Tech...</span>
         </div>
       </div>
     );

@@ -46,7 +46,7 @@ export const Navbar: React.FC<NavbarProps> = ({
       {/* Left: Breadcrumbs */}
       <div className="navbar-left">
         <div className="breadcrumbs">
-          <span>Vantage</span>
+          <span>Tdami Tech</span>
           <span>/</span>
           <span className="current">{getBreadcrumbTitle()}</span>
         </div>
