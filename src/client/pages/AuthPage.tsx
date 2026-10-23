@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { login, register, ApiError } from '../api.js';
 import { User } from '../types.js';
+import { TadmiLogo } from '../components/TadmiLogo.js';
 
 interface AuthPageProps {
   onSuccess: () => void;
@@ -45,25 +46,13 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onSuccess }) => {
     }
   };
 
-  const handleQuickDemo = (demoEmail: string) => {
-    setMode('login');
-    setEmail(demoEmail);
-    setPassword('password123');
-    setError(null);
-  };
-
 
   return (
     <div className="auth-layout">
       {/* Top Navigation */}
       <header className="auth-top-nav">
         <div className="auth-brand">
-          <svg className="auth-brand-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-            <polygon points="12 2 2 7 12 12 22 7 12 2" />
-            <polyline points="2 17 12 22 22 17" />
-            <polyline points="2 12 12 17 22 12" />
-          </svg>
-          <span>Tdami Tech</span>
+          <TadmiLogo variant="full" height={24} color="#09090b" />
         </div>
         <div className="auth-env-badge">
           <span className="dot" />
@@ -76,15 +65,11 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onSuccess }) => {
         <div className="auth-card-wrapper">
           {/* Brand Logo Badge */}
           <div className="auth-logo-badge">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-              <polygon points="12 2 2 7 12 12 22 7 12 2" />
-              <polyline points="2 17 12 22 22 17" />
-              <polyline points="2 12 12 17 22 12" />
-            </svg>
+            <TadmiLogo variant="icon" height={24} color="#ffffff" />
           </div>
 
           <h1 className="auth-title">
-            {mode === 'login' ? 'Sign in to Tdami Tech' : 'Create your Tdami Tech account'}
+            {mode === 'login' ? 'Sign in to TADMI' : 'Create your TADMI account'}
           </h1>
           <p className="auth-subtitle">
             {mode === 'login'
@@ -238,7 +223,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onSuccess }) => {
           <div className="auth-toggle-note">
             {mode === 'login' ? (
               <>
-                New to Tdami Tech?{' '}
+                New to TADMI?{' '}
                 <button
                   type="button"
                   className="auth-toggle-link"
@@ -267,47 +252,12 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onSuccess }) => {
             )}
           </div>
 
-          {/* Quick Demo Accounts Drawer */}
-          <div className="auth-demo-picker">
-            <div className="auth-demo-title">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
-              </svg>
-              <span>Quick Demo Accounts (Password: <code>password123</code>)</span>
-            </div>
-            <div className="auth-demo-btns">
-              <button
-                type="button"
-                className="auth-demo-chip"
-                onClick={() => handleQuickDemo('alex@acme.corp')}
-                title="Admin / Executive Overview"
-              >
-                Alex Mercer (Admin)
-              </button>
-              <button
-                type="button"
-                className="auth-demo-chip"
-                onClick={() => handleQuickDemo('sarah@acme.corp')}
-                title="Sales Manager"
-              >
-                Sarah Kim (Manager)
-              </button>
-              <button
-                type="button"
-                className="auth-demo-chip"
-                onClick={() => handleQuickDemo('priya@acme.corp')}
-                title="Account Executive"
-              >
-                Priya Singh (AE)
-              </button>
-            </div>
-          </div>
         </div>
       </main>
 
       {/* Bottom Footer */}
       <footer className="auth-bottom-footer">
-        <div>© 2025 Tdami Tech Inc. Encrypted SOC-2 Type II.</div>
+        <div>© 2025 TADMI Inc. Encrypted SOC-2 Type II.</div>
         <div className="auth-bottom-links">
           <a href="#terms" onClick={(e) => e.preventDefault()}>Terms</a>
           <a href="#privacy" onClick={(e) => e.preventDefault()}>Privacy</a>

@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 216 44" fill="none">
+  <!-- T -->
+  <line x1="4" y1="6" x2="42" y2="6" stroke="#09090b" stroke-width="4.2" stroke-linecap="butt" />
+  <line x1="23" y1="6" x2="23" y2="38" stroke="#09090b" stroke-width="4.2" stroke-linecap="butt" />
+
+  <!-- A -->
+  <polyline points="52,38 69.5,6 87,38" stroke="#09090b" stroke-width="4.2" stroke-linecap="butt" stroke-linejoin="miter" />
+  <circle cx="69.5" cy="32" r="3.5" fill="#EA5B2D" />
+
+  <!-- D (Modern open curve) -->
+  <path d="M 98 6 L 115 6 A 16 16 0 0 1 115 38 L 98 38" stroke="#09090b" stroke-width="4.2" stroke-linecap="butt" fill="none" />
+
+  <!-- M -->
+  <polyline points="140,38 140,6 159,27 178,6 178,38" stroke="#09090b" stroke-width="4.2" stroke-linecap="butt" stroke-linejoin="miter" fill="none" />
+
+  <!-- I -->
+  <line x1="192" y1="6" x2="192" y2="38" stroke="#09090b" stroke-width="4.2" stroke-linecap="butt" />
+</svg>

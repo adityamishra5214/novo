@@ -12,6 +12,7 @@ import { AuditLogPage } from './pages/AuditLogPage.js';
 import { AuthPage } from './pages/AuthPage.js';
 import { User, Membership, Company, PersonaOption } from './types.js';
 import { fetchMe, logout, switchMembershipContext, setActiveMembershipId } from './api.js';
+import { TadmiLogo } from './components/TadmiLogo.js';
 
 export const App: React.FC = () => {
   const [currentTab, setCurrentTab] = useState<string>('overview');
@@ -77,7 +78,7 @@ export const App: React.FC = () => {
     setUser(null);
     setMembership(null);
     setCompany(null);
-    showToast('Signed out of Tdami Tech.');
+    showToast('Signed out of TADMI.');
   };
 
   const workspaceId = company?.id || 'company_acme';
@@ -87,10 +88,11 @@ export const App: React.FC = () => {
     return (
       <div style={{ display: 'flex', minHeight: '100vh', alignItems: 'center', justifyContent: 'center', background: '#fafafa' }}>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '14px' }}>
-          <div style={{ width: '38px', height: '38px', background: '#09090b', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700 }}>
-            T
+          <div style={{ width: '42px', height: '42px', background: '#09090b', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>
+            <TadmiLogo variant="icon" height={22} color="#ffffff" />
           </div>
-          <span style={{ fontSize: '13px', color: '#71717a' }}>Loading Tdami Tech...</span>
+          <TadmiLogo variant="full" height={20} color="#09090b" />
+          <span style={{ fontSize: '12px', color: '#71717a', marginTop: '-4px' }}>Loading workspace...</span>
         </div>
       </div>
     );

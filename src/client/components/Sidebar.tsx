@@ -13,6 +13,7 @@ import {
   LogOut,
 } from 'lucide-react';
 import { Membership, User, Company } from '../types.js';
+import { TadmiLogo } from './TadmiLogo.js';
 
 interface SidebarProps {
   currentTab: string;
@@ -40,9 +41,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {/* Brand & Workspace Switcher */}
       <div className="sidebar-header">
         <div className="brand-row">
-          <div className="brand-logo">
-            <div className="brand-icon-box">T</div>
-            <span>Tdami Tech</span>
+          <div className="brand-logo" style={{ display: 'flex', alignItems: 'center', gap: '9px' }}>
+            <div className="brand-icon-box" style={{ width: '28px', height: '28px', borderRadius: '7px', background: '#09090b', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <TadmiLogo variant="icon" height={18} color="#ffffff" />
+            </div>
+            <TadmiLogo variant="full" height={18} color="#0f172a" />
           </div>
           <div className="live-badge">
             <span className="pulse-dot"></span>
@@ -150,7 +153,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               e.stopPropagation();
               onLogout?.();
             }}
-            title="Sign out of Tdami Tech"
+            title="Sign out of TADMI"
             style={{
               background: 'none',
               border: 'none',
